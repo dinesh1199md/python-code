@@ -1,0 +1,39 @@
+trigger:
+  -branches:
+   include:
+     -main
+   exclude:
+    -feature/one  
+pr:
+  -branches:
+   include:
+     -feature/*     
+
+stages:
+  -stage: Build
+  jobs:
+    -job:
+      steps:
+      -script:
+        echo "Build the application"
+      -task: Docker@1
+  -stage: test
+   dependsOn:Build
+  jobs:
+    -job:
+      steps:
+      -script:
+        echo "test the application"
+      -task: Docker@1
+  -stage: deploy
+   dependsOn:test
+  jobs:
+    -job:
+      steps:
+      -script:
+        echo "deploy the application"
+      -task: kubernetes@1
+
+  
+
+

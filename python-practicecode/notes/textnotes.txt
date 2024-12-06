@@ -1,0 +1,23 @@
+Special Operators in Python
+
+*is
+* is not
+* in 
+* not in
+
+
+
+	
+Identity Operators                              Equality Operators
+
+Operator    is                                      == and !=
+
+Purpose     Compare object identity                 Compare object equality based on values
+
+Comparison Basis    Memory addresses of objects     Values of 
+
+
+
+Escape Characters \
+
+--> txt = "We are the so-called \"Vikings\" from the north."

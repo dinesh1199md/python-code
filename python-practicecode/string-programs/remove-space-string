@@ -1,0 +1,11 @@
+def remove_space(s):
+    # print([i for i in s if not i.isspace()])
+    print("".join(list([i for i in s if i!=" "])))
+remove_space("hello this is dinesh")  
+
+def remove_space2(s):
+    print("".join(list(map(lambda x:x.strip(),s.split()))))
+    
+remove_space2("hello this is dinesh")  
+ 
+ 

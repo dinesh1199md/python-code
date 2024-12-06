@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-rgw-radsec
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: mit-eastus2-dev-gen-rg-01
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 20.157.66.80
+  externalTrafficPolicy: Local
+  ports:
+  - port: 2083
+  selector:
+          #app: dev-rgw-radsec
+    app: dev-rgw-radsec-test-2
+  loadBalancerSourceRanges:
+  - 206.59.255.0/24
