@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-radsec
+spec:
+  replicas: 6
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1      # Ensures only 1 pod is unavailable during the update
+      maxSurge: 2            # Allows up to 2 additional pods above the desired replicas count during the update
+  selector:
+    matchLabels:
+       app: dev-radsec
+  template:
+    metadata:
+      labels:
+        app: dev-radsec
+    spec:
+      volumes:
+      - name: azureconfig
+        persistentVolumeClaim:
+           claimName: azureconfig
+      - name: azurelogs
+        persistentVolumeClaim:
+           claimName: azurelogs
+      - name: azurecerts
+        persistentVolumeClaim:
+           claimName: azurecerts
+      containers:
+      - name: radsec-service
+        image: wificloudautheastus2crazjvbuov.azurecr.io/lab-tlsoffload:#!VERSION!#
+        ports:
+        - containerPort: 2083
+        securityContext:
+           runAsNonRoot: true
+           runAsUser: 1000
+        volumeMounts:
+        - name: azureconfig
+          mountPath: /radsec-config
+          readOnly: True
+        - name: azurecerts
+          mountPath: /certs
+          readOnly: True
+        - name: azurelogs
+          mountPath: /var/log/freeradius
+        resources:
+          requests:
+            memory: "256Mi"
+          limits:
+            memory: "512Mi"
+      nodeSelector:
+          nodetype: tlsoffload       
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radsec
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: mit-eastus2-dev-gen-rg-01
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 20.47.76.188
+  externalTrafficPolicy: Local
+  ports:
+  - port: 2083
+  selector:
+    app: dev-radsec
+  loadBalancerSourceRanges:
+  - 206.59.255.0/24
+
+
+# kubectl apply -f deployment.yaml
+# kubectl rollout status deployment/dev-radsec
+# kubectl rollout undo deployment/dev-radsec

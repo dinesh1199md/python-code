@@ -1,0 +1,45 @@
+
+trigger:
+   include:
+      - main
+   paths:
+      -src/test/*
+      -src/test2/*
+
+#  variables
+azsub: sub3636
+acrname: "azacr"
+
+ stages:
+   stage:
+      displayname: "buil the code"
+      jobs:
+        job:
+        pool:
+            $(agent)
+          task: docker@1
+          input:
+            azuresubcription: $(azdub)
+            acr: $(acrname)
+            command: build an image
+            image: image-234-(variable)  
+
+
+    stage:
+        displayname: "dploy to aks"
+        depends_on: buil the code
+        environment:
+        jobs:
+          job:
+          pool:
+              $(agent)
+            task: kubernetes@1
+            script: 
+            input:
+              azuresubcription: $(azdub)
+              command: build an image
+  
+
+
+            
+

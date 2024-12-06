@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dev-radsec-rmr
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+       app: dev-radsec-rmr
+  template:
+    metadata:
+      labels:
+        app: dev-radsec-rmr
+    spec:
+      volumes:
+        - name: azureconfig
+          persistentVolumeClaim:
+            claimName: azureconfig
+        - name: azurecerts
+          persistentVolumeClaim:
+            claimName: azurecerts
+      containers:
+      - name:  radsec-service
+        image: wificloudautheastus2crazjvbuov.azurecr.io/lab-tlsoffload:#!VERSION!#
+        ports:
+        - containerPort: 2083
+        securityContext:
+           readOnlyRootFilesystem: true
+           runAsNonRoot: true
+           runAsUser: 1000
+        volumeMounts:
+        - name: azureconfig
+          mountPath: /radsec-config
+          readOnly: True
+        - name: azurecerts
+          mountPath: /certs
+          readOnly: True
+        - name: azurelogrmr
+          mountPath: /app-mount
+        resources:
+          requests:
+            memory: "512Mi"
+          limits:
+            memory: "1Gi"
+      nodeSelector:
+          nodetype: tlsoffload
+  volumeClaimTemplates:
+    - metadata:
+        name: azurelogrmr
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: tlsoffload-log-azurefile-sts
+        resources:
+          requests:
+            storage: 15Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radsec
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: mit-eastus2-dev-gen-rg-01
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 20.47.76.188
+  externalTrafficPolicy: Local
+  ports:
+  - port: 2083
+  selector:
+    app: dev-radsec-rmr
+  loadBalancerSourceRanges:
+  - 206.59.255.0/24
+ 
+---
+---
+#ServciceAccount Creation
+apiVersion: v1
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: sts-restart-sa
+  namespace: mitran-dev
+ 
+---
+#Role Creation
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sts-restart-role
+  namespace: mitran-dev
+rules:
+  - apiGroups: ["apps", "extensions"]
+    resources: ["deployments","statefulsets"]
+    resourceNames: ["dev-radsec-rmr","dev-rgw-radsec-rmr"]
+    verbs: ["get", "patch", "list", "watch"]
+ 
+---
+#RoleBind Creation
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sts-restart-rolebind
+  namespace: mitran-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sts-restart-role
+subjects:
+  - kind: ServiceAccount
+    name: sts-restart-sa
+    namespace: mitran-dev
+ 
+---
+#CronJob for dev-radsec-rmr pods restart
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: restart-dev-radsec-rmr
+  namespace: mitran-dev
+spec:
+  concurrencyPolicy: Forbid
+  schedule: '30 8 * * *'
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          serviceAccountName: sts-restart-sa
+          restartPolicy: Never
+          containers:
+            - name: kubectl
+              image: wificloudautheastus2crazjvbuov.azurecr.io/custom-kubectl:24.22.0-1
+              command:
+                - 'kubectl'
+                - 'rollout'
+                - 'restart'
+                - 'statefulset/dev-radsec-rmr'

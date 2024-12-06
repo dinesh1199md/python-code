@@ -1,0 +1,130 @@
+trigger: none
+ 
+variables:
+  system.debug: 'false'
+ 
+# System Variables
+  agentPool: infrastructure-DevOps-eastus2-AgentPool
+ 
+# Tags for the container image
+  Version.MajorMinor: dev-24.2.0
+  Version.Revision: $[counter(variables['Version.MajorMinor'], 1)]
+  app_version: $(Version.MajorMinor)-$(Version.Revision)
+  tag: '$(app_version)'
+  freerad: 'rgw-freeradius-radsec'
+  radsecRgw: 'lab-rgw-tlsoffload'
+ 
+  # branchName is used for veracode scans
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/') }}:
+    branchName: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/pull/') }}:
+    branchName: $[ replace(variables['System.PullRequest.TargetBranch'], 'refs/heads/', '') ]
+ 
+# Application variables 
+  DockerfilePath: '$(Build.SourcesDirectory)'
+  
+# Declare env variables
+  azureSubscription: 30828-nprd-services-sc
+  azureResourceGroup: mit-eastus2-dev-gen-rg-01
+  kubernetesCluster: mit-eastus2-dev01-aks
+  ACR: wificloudautheastus2crazjvbuov.azurecr.io
+ 
+stages:
+# Build freeradius module 
+- stage: freeradius_module
+  displayName: Build and push freeradius image stage
+  jobs:
+  - job: Build
+    displayName: Build freeradius-radsec image
+    pool:
+      name: '$(agentPool)'
+    steps:
+    - checkout: self
+    - task: Docker@1
+      displayName: Build freeradius-radsec image
+      inputs:
+        azureSubscriptionEndpoint: '$(azureSubscription)'
+        azureContainerRegistry: '$(ACR)'
+        command: Build an image
+        imageName: '$(freerad):$(tag)'
+        dockerFile: 'freeradius/Dockerfile'
+    - task: Docker@1
+      displayName: Push the freeradius-radsec image to ACR
+      inputs:
+        azureSubscriptionEndpoint: '$(azureSubscription)'
+        azureContainerRegistry: '$(ACR)'
+        command: Push an image
+        imageName: '$(ACR)/$(freerad):$(tag)'
+# Build rgw radsec module 
+- stage: rgw_radsec_module
+  displayName: Build and push RGW radsec image stage
+  jobs:
+  - job: Build
+    displayName: Build RGW radsec image
+    pool:
+      name: '$(agentPool)'
+    steps:
+    - checkout: self
+    - script: |
+          sed 's/#!VERSION!#/$(tag)/g' $(DockerfilePath)/services/Dockerfile.rgw > $(DockerfilePath)/services/taggedDockerfile
+          sed -i '14 i COPY lab-scripts/prepare-lab-rgw prepare-lab-rgw' $(DockerfilePath)/services/taggedDockerfile
+          sed -i '21 i RUN chmod 755 prepare-lab-rgw' $(DockerfilePath)/services/taggedDockerfile
+          sed -i '22 i RUN sed -i "2 i /prepare-lab-rgw" /usr/bin/startservice' $(DockerfilePath)/services/taggedDockerfile
+    - task: Docker@1
+      displayName: Build RGW Radsec image
+      inputs:
+        azureSubscriptionEndpoint: '$(azureSubscription)'
+        azureContainerRegistry: '$(ACR)'
+        command: Build an image
+        imageName: '$(radsecRgw):$(tag)'
+        dockerFile: 'services/taggedDockerfile'
+    - task: Docker@1
+      displayName: Push RGW tlsoffload image to ACR
+      inputs:
+        azureSubscriptionEndpoint: '$(azureSubscription)'
+        azureContainerRegistry: '$(ACR)'
+        command: Push an image
+        imageName: '$(ACR)/$(radsecRgw):$(tag)'  
+    - task: CopyFiles@2
+      displayName: Copy files to Staging Directory
+      inputs: 
+        Contents: '$(Build.SourcesDirectory)/DEV/deployment_rgs.yaml'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifacts: drop'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: drop  
+ 
+#Deploy RGW Radsec to AKS cluster
+- stage: Deploy
+  displayName: Deploy RGW Radsec to container
+  jobs:
+    - job: Deploy
+      displayName: Deploying RGW Radsec to container
+      pool:
+        name: '$(agentPool)'
+      steps:
+      - checkout: self
+      - task: DownloadBuildArtifacts@1
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'drop'
+          downloadPath: '$(System.ArtifactsDirectory)'
+      - script: |
+          sed 's/#!VERSION!#/$(tag)/g' $(System.ArtifactsDirectory)/drop/DEV/deployment_rgs.yaml > deploy_rgs.yaml
+          cat deploy_rgs.yaml
+      - task: Kubernetes@1
+        displayName: kubectl deploy RGW Radsec
+        inputs:
+          connectionType: Azure Resource Manager
+          azureSubscriptionEndpoint: '$(azureSubscription)'
+          azureResourceGroup: '$(azureResourceGroup)'
+          kubernetesCluster: '$(kubernetesCluster)'
+          namespace: mitran-dev
+          command: apply
+          useConfigurationFile: true
+          configuration: 'deploy_rgs.yaml'
+          outputFormat: none
+          forceUpdate: false

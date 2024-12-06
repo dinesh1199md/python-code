@@ -1,0 +1,74 @@
+
+# CI (Continuous Integration) Trigger
+"""in this example, the pipeline triggers when changes
+ are pushed to the main or develop branch, but not for branches with names that start with feature/."""
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+    exclude:
+      - feature/*
+
+
+# PR (Pull Request) Trigger
+"""This trigger runs the pipeline 
+for specific pull request (PR) events, useful for validating code changes before merging."""
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+
+# Scheduled Trigger
+schedules:
+  - cron: "0 5 * * 1" # Runs every Monday at 5:00 AM UTC
+    displayName: Weekly Monday Trigger
+    branches:
+      include:
+        - main
+    always: true
+
+
+#pipeline trigger 
+"""This trigger starts a pipeline when another 
+pipeline completes. Useful in scenarios where multiple pipelines are chained together."""
+
+resources:
+  pipelines:
+    - pipeline: upstreamPipeline
+      source: my-other-pipeline
+      trigger:
+        branches:
+          include:
+            - main
+# incremental pipeline
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/frontend/*
+      - src/backend/*
+
+jobs:
+- job: Build_Frontend
+  displayName: "Build Frontend"
+  condition: |
+    contains(variables['Build.TriggeredBy'], 'src/frontend/')
+  steps:
+    - script: echo "Building Frontend"
+      # Add other steps to build frontend
+
+- job: Build_Backend
+  displayName: "Build Backend"
+  condition: |
+    contains(variables['Build.TriggeredBy'], 'src/backend/')
+  steps:
+    - script: echo "Building Backend"
+      # Add other steps to build backend

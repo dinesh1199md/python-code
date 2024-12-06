@@ -1,0 +1,151 @@
+# Python Function App to Linux on Azure
+# Build a Python function app and deploy it to Azure as a Linux function app.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+ 
+trigger: none
+ 
+variables:
+  System.Debug: true
+ 
+  # Azure Resource Manager connection created during pipeline creation
+  azureSubscription: "30828-daypass-prod-sc"
+  #azureServiceConnectionId_NPRD: "infrastructure-NPRD-ServiceConnection"
+  #azureServiceConnectionId_PROD: "30828-daypass-prod-sc"
+ 
+  # Function app name
+  functionAppName: "wap-mlb-prod-001"
+ 
+ 
+  # # Agent VM image name
+  # vmImageName: 'ubuntu-latest'
+  # agent pool name
+  agent_pool: infrastructure-DevOps-eastus2-AgentPool
+ 
+  # BNS release version number
+  Version.MajorMinor: 24.4.0
+  Version.Revision: $[counter(variables['Version.MajorMinor'], 1)]
+  app_version: $(Version.MajorMinor)-$(Version.Revision)
+ 
+  # Working Directory
+  workingDirectory: $(System.DefaultWorkingDirectory)
+ 
+  pythonVersion: 3.10
+  runtimeStack: PYTHON|3.10
+ 
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/') }}:
+    branchName: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/pull/') }}:
+    branchName: $[ replace(variables['System.PullRequest.TargetBranch'], 'refs/heads/', '') ]
+ 
+stages:
+  - stage: Build
+    displayName: Build stage
+ 
+    jobs:
+      - job: Build
+        displayName: Build
+        pool: $(agent_pool)
+ 
+        steps:
+          - script: |
+              echo "##vso[build.updatebuildnumber]$(app_version)" ## update version number in listing
+ 
+          - script: |
+              git_rev=git rev-parse --short HEAD
+              echo ""
+              echo "Full git hash:  $(Build.SourceVersion)"
+              echo "Short git hash: $git_rev"
+              echo "##vso[task.setvariable variable=git_rev]$git_rev"  ## Store variable for subsequent steps
+            workingDirectory: $(workingDirectory)
+            displayName: Get short git hash
+ 
+          - script: |
+              perl -p -i -e 's/0.0.0/$(app_version):$(git_rev)/' src/config.py
+            workingDirectory: $(workingDirectory)
+            displayName: "Update app version to $(app_version)"
+ 
+            # create an artifact that contains only our sources -- primarily for veracode
+          - task: ArchiveFiles@2
+            displayName: "Archive files"
+            inputs:
+              rootFolderOrFile: '$(workingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-base.zip'
+              replaceExistingArchive: true
+              verbose: true
+ 
+          - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId)-base.zip
+            displayName: "Upload package"
+            artifact: base
+ 
+          - script: |
+              if [ -f extensions.csproj ]
+              then
+                  dotnet build extensions.csproj --output ./bin
+              fi
+              python3 -m venv worker_venv
+              source worker_venv/bin/activate
+              python3 -m pip install --upgrade pip
+              pip install --target="./.python_packages/lib/site-packages" -r ./requirements.txt
+            workingDirectory: $(workingDirectory)
+            displayName: "Install requirements"
+ 
+          - task: ArchiveFiles@2
+            displayName: "Archive files"
+            inputs:
+              rootFolderOrFile: "$(workingDirectory)"
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+              replaceExistingArchive: true
+              verbose: false
+ 
+          - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+            artifact: drop
+ 
+  - stage: VeracodeScan
+    displayName: Veracode Scan
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: VeracodeScanJob
+        pool: $(agent_pool)
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: "current"
+              targetPath: "$(Build.ArtifactStagingDirectory)"
+              artifactName: "base"
+ 
+          - task: Veracode@3
+            inputs:
+              ConnectionDetailsSelection: "Endpoint"
+              AnalysisService: "30828VeracodeScan"
+              veracodeAppProfile: "30828-mlb-game-status"
+              version: "$(build.buildNumber)"
+              filepath: "$(Build.ArtifactStagingDirectory)"
+              maximumWaitTime: "360"
+              sandboxName: "$(branchName)"
+              createSandBox: true
+              importResults: true
+ 
+  - stage: VeracodeSCAScan
+    displayName: Veracode SCA Scan
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: VeracodeScanJob
+        pool: $(agent_pool)
+        steps:
+          # bash task to scan the project sources using Veracode SCA
+          # SRCCLR_API_TOKEN is expected to be a pipeline variable
+          - bash: |
+              python3 -m venv venv
+              source venv/bin/activate
+              export SRCCLR_API_TOKEN=$(SRCCLR_API_TOKEN)
+              srcclr scan $(Build.SourcesDirectory) --allow-dirty
+              echo "Veracode SourceClear Scan"
+            displayName: 'Veracode SCA Scan'
+ 
