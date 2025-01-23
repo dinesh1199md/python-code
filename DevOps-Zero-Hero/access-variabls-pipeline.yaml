@@ -1,0 +1,82 @@
+# Method 1: Using Output Variables
+# Output variables allow you to pass values between tasks within the same job or across jobs in a pipeline.
+
+# Example: Passing Variables Between Tasks
+
+
+jobs:
+  - job: SetVariableJob
+    displayName: Set Variable Job
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - script: |
+          echo "##vso[task.setvariable variable=myVariable;isOutput=true]HelloFromTask1"
+        name: setVar
+        displayName: 'Set Output Variable'
+
+  - job: UseVariableJob
+    displayName: Use Variable Job
+    dependsOn: SetVariableJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    variables:
+      taskOutput: $[ dependencies.SetVariableJob.outputs['setVar.myVariable'] ]
+    steps:
+      - script: |
+          echo "The value of the variable is: $(taskOutput)"
+        displayName: 'Use Output Variable'
+
+# Key Points:
+# Set Variable:
+
+# Use the ##vso[task.setvariable] command to set a variable and make it available to other tasks.
+# Use isOutput=true to make the variable accessible to other jobs.
+# Access Variable:
+# Use dependencies.JobName.outputs['TaskName.VariableName'] to access the output variable in another job.
+
+# -------------------------------------
+
+# Method 2: Using Pipeline Variables
+# Pipeline variables can be defined in one task and used in another within the same job.
+
+# Example: Passing Variables in the Same Job
+
+steps:
+  - script: |
+      echo "##vso[task.setvariable variable=myVariable]HelloFromTask1"
+    displayName: 'Set Pipeline Variable'
+
+  - script: |
+      echo "The value of the variable is: $(myVariable)"
+    displayName: 'Use Pipeline Variable'
+
+
+
+# Key Points:
+# The ##vso[task.setvariable] command sets a pipeline variable that is available to subsequent tasks in the same job.
+# Use the variable as $(VariableName) in other tasks.
+
+# -----------------------------------
+# Method 3: Using Predefined Variables
+# Azure DevOps provides predefined variables that persist across tasks and jobs. You can use them to share information like file paths or build numbers.
+
+# Example: Sharing Build Artifacts Path
+
+steps:
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'MyArtifact'
+    displayName: 'Publish Artifact'
+
+  - script: |
+      echo "Artifact path is: $(Build.ArtifactStagingDirectory)"
+    displayName: 'Use Build Artifact Path'
+
+
+
+# When to Use Each Method
+# Output Variables: When passing variables between jobs or tasks in different scopes.
+# Pipeline Variables: When passing variables between tasks in the same job.
+# Predefined Variables: For built-in pipeline context or specific Azure DevOps operations (e.g., paths, IDs).

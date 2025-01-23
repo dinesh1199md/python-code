@@ -11,4 +11,6 @@ def merge_sorted_lists(l1, l2):
   fa.extend(l1[i:])
   fa.extend(l2[j:])
   return fa
+
+ 
 print(merge_sorted_lists([1,3,5],[2,4,6]))

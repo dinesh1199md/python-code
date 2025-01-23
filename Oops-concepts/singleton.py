@@ -7,4 +7,4 @@ class Singleton:
 obj=Singleton()
 obj1=Singleton()
 
-print(obj==obj1)
+print(obj==obj1) 

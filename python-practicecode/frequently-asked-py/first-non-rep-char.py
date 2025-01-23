@@ -12,10 +12,7 @@ def first_non_rep_char(s):
         return list(s).index(word[0]),word
     else:
        return -1
-    
 
-
-    
 def method(s):    
     curr = list(s)
     for i in range(0,len(s)):

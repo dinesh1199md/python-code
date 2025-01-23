@@ -1,0 +1,92 @@
+#self: Refers to the current repository.
+
+steps:
+- checkout: self  # Fetches the source repository
+
+steps:
+- checkout: self
+  clean: true
+  persistCredentials: true
+
+
+#Fetch Source Code for External or Multi-Repository Setup
+resources:
+  repositories:
+  - repository: externalRepo
+    type: git
+    name: MyProject/ExternalRepo
+    ref: main
+
+steps:
+- checkout: self  # Fetch the primary repository
+- checkout: externalRepo  # Fetch the external repository
+
+- script: |
+    echo "Contents of primary repo:"
+    ls -la
+    echo "Contents of external repo:"
+    ls -la $(Build.SourcesDirectory)/../externalRepo
+  displayName: "Access Multiple Repositories"
+ 
+
+
+  #The ##vso[task.setvariable] logging command allows you
+  #to set a variable in one task and make it available to subsequent tasks.
+
+  steps:
+- script: |
+    echo "Setting a variable"
+    echo "##vso[task.setvariable variable=myVariable]HelloWorld"
+  displayName: "Set Variable"
+
+- script: |
+    echo "Accessing the variable"
+    echo "Value of myVariable: $(myVariable)"
+  displayName: "Access Variable"
+
+#You can set a variable as an output variable from one job or deployment step and access it in another.
+jobs:
+- job: JobA
+  steps:
+  - script: |
+      echo "##vso[task.setvariable variable=outputVar;isOutput=true]ValueFromJobA"
+    displayName: "Set Output Variable"
+
+- job: JobB
+  dependsOn: JobA
+  variables:
+    myOutput: $[ dependencies.JobA.outputs['outputVar'] ]
+  steps:
+  - script: |
+      echo "Accessing output variable"
+      echo "Value of myOutput: $(myOutput)"
+    displayName: "Use Output Variable"
+
+#The isOutput=true flag makes the variable outputVar an output variable for JobA.
+#In JobB, the dependencies.JobA.outputs['outputVar'] syntax retrieves the variable's value.
+
+# ------------------------------
+
+# Build.SourcesDirectory
+# Description:
+# This variable points to the directory where the source code is cloned during the pipeline execution.
+#  It contains the files fetched by the checkout step for the primary repository or repositories.
+steps:
+- script: |
+    echo "Source directory path: $(Build.SourcesDirectory)"
+    ls -la $(Build.SourcesDirectory)
+  displayName: "List files in Source Directory"
+
+# ----------------------------------
+  # Pipeline.Workspace
+  # Description:
+  # This variable points to the root directory used for all tasks and pipelines running on the current agent. It is the workspace directory for the pipeline, encompassing all repositories and artifacts associated with the pipeline run.
+  
+  # Scope:
+  # Broad, covering all jobs and tasks within the pipeline.
+
+  steps:
+- script: |
+    echo "Workspace directory path: $(Pipeline.Workspace)"
+    ls -la $(Pipeline.Workspace)
+  displayName: "List files in Workspace Directory"

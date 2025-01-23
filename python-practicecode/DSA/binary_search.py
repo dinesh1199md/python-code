@@ -1,9 +1,9 @@
 def binary_search(list,target):
     left,right=0,len(list)-1
     while left <= right:
-        # print("left:",left,"right:",right)    
+        print("left:",left,"right:",right)    
         mid=(left+right)//2
-        # print("mid:",mid)
+        print("mid:",mid)
         if list[mid]==target:
             return mid
         elif(list[mid]<target):

@@ -97,5 +97,4 @@ async def main():
         task("Task 1", 2),
         task("Task 2", 3)
     )
-
 asyncio.run(main())

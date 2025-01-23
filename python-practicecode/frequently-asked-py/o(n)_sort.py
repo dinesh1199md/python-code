@@ -32,4 +32,27 @@ print(arr)
 # [0,0,1,1,2,2] l=2,m=4,h=3
 
 
+def dutch_national_flag(arr):
+    low, high = 0, len(arr) - 1
+    i = 0
+    
+    while i <= high:
+        if arr[i] == 0:
+            arr[i], arr[low] = arr[low], arr[i]
+            low += 1
+            i += 1
+            print("zero",arr)
+        elif arr[i] == 2:
+            arr[i], arr[high] = arr[high], arr[i]
+            high -= 1
+            print("two",arr)
+        else:
+            i += 1
+            print("one",arr)
+    return arr
+ 
+# Test the function
+input_array = [1, 0, 2, 1, 0]
+output = dutch_national_flag(input_array)
+print("Sorted Array:", output)
 

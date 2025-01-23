@@ -36,7 +36,7 @@ class Person:
         self.__id=id
     def get_name(self):
         print("Name :",self.name)
-    def get_age(self):
+    def get_age(self): 
         print("age :",self._age)
     def get_id(self):
         print("id :",self.__id) 

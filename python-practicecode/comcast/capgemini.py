@@ -48,8 +48,7 @@ def gen(n):
 p=gen(10)
 print(list((p)))
 
-'''decotrators'''
-
+'''decotrators''' 
 c=0
 def dico1(func):
     def inner(a,b):

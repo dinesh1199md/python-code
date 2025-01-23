@@ -5,7 +5,6 @@ import json,uvicorn
 app=FastAPI()
 
 
-
 class Item(BaseModel):
     name: str
     id: int

@@ -11,7 +11,6 @@ trigger:
     exclude:
       - feature/*
 
-
 # PR (Pull Request) Trigger
 """This trigger runs the pipeline 
 for specific pull request (PR) events, useful for validating code changes before merging."""

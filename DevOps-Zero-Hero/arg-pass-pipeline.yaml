@@ -1,0 +1,44 @@
+# File: script.py
+import argparse
+
+# Create argument parser
+parser = argparse.ArgumentParser(description="Process some arguments.")
+parser.add_argument('--arg1', type=str, required=True, help='First argument')
+parser.add_argument('--arg2', type=int, required=True, help='Second argument')
+
+# Parse arguments
+args = parser.parse_args()
+
+# Print arguments
+print(f"Argument 1: {args.arg1}")
+print(f"Argument 2: {args.arg2}")
+
+
+
+
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  ArgumentOne: 'DynamicValue'
+  ArgumentTwo: 456
+
+stages:
+  - stage: ExampleStage
+    displayName: 'Example Stage'
+    jobs:
+      - job: ExampleJob
+        displayName: 'Example Job'
+        steps:
+          - task: PythonScript@1
+            displayName: 'Run Python Script with Dynamic Variables'
+            inputs:
+              scriptSource: 'filePath'
+              scriptPath: './script.py'
+              arguments: '--arg1 $(ArgumentOne) --arg2 $(ArgumentTwo)'
+
+
+
+

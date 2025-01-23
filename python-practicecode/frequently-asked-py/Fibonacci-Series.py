@@ -75,6 +75,6 @@ def fib_gen():
         yield a
         a,b=b,a+b
 fibb=fib_gen()
-# for i in range(10):
-#     print(next(fibb),end=" ")
+for i in range(10):
+    print(next(fibb),end=" ")
 

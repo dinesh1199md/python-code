@@ -1,0 +1,104 @@
+trigger:
+  branches:
+    include:
+      - main
+
+resources:
+  repositories:
+    - repository: Repo1
+      type: git
+      name: Project/Repo1
+      ref: main # Specify the branch
+    - repository: Repo2
+      type: git
+      name: Project/Repo2
+      ref: develop
+
+stages:
+  - stage: Build
+    displayName: 'Build Stage'
+    jobs:
+      - job: BuildJob
+        displayName: 'Fetch and Build Code'
+        steps:
+          # Checkout the primary repository (default behavior)
+          - checkout: self
+
+          # Checkout the additional repository (Repo1)
+          - checkout: Repo1
+
+          # Checkout another additional repository (Repo2)
+          - checkout: Repo2
+
+          # List contents of each repository
+          - script: |
+              echo "Primary repository contents:"
+              ls $(Build.SourcesDirectory)
+
+              echo "Repo1 contents:"
+              ls $(Build.SourcesDirectory)/Repo1
+
+              echo "Repo2 contents:"
+              ls $(Build.SourcesDirectory)/Repo2
+            displayName: 'List Repository Contents'
+
+
+# ------------------------------------------
+
+# Variables
+# Purpose:
+
+# Used to store values that can be accessed and modified during the pipeline's execution.
+# Typically used for runtime flexibility.
+# Scope:
+
+# Variables can be defined at different levels: pipeline, stage, or job.
+# They are mutable, meaning their values can change during execution.
+# Usage:
+
+# Accessed using $(VariableName) syntax.
+# Can be passed between tasks, stages, or jobs.
+
+variables:
+  myVar: 'Hello World'
+
+stages:
+  - stage: Example
+    jobs:
+      - job: PrintVariable
+        steps:
+          - script: |
+              echo "The value of myVar is $(myVar)"
+            displayName: 'Print Variable'
+
+# --------------------------------------------------------
+
+# Parameters
+# Purpose:
+
+# Allow customization of pipelines by enabling user-defined values when the pipeline starts.
+# Typically used for defining values that remain immutable during pipeline execution.
+# Scope:
+
+# Parameters are defined at the pipeline level and cannot be modified after the pipeline starts.
+# Usage:
+
+# Accessed using $(ParameterName) syntax.
+# Defined in the parameters block and passed to stages, jobs, or tasks.
+
+parameters:
+  - name: environment
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - prod
+
+stages:
+  - stage: Deploy
+    jobs:
+      - job: DeployJob
+        steps:
+          - script: |
+              echo "Deploying to $(environment)"
+            displayName: 'Deploy Script'
